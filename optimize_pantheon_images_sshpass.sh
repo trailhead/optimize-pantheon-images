@@ -23,7 +23,7 @@ function optimize_pantheon_images() {
 	# checks for the presence of jpegtran, which we use for image optimization
 	command -v jpegtran >/dev/null 2>&1 || { echo >&2 "I require jpegtran but it's not installed. Aborting."; exit 1; }
 
-	# checks for the presence of jpegtran, which we use for image optimization
+	# checks for the presence of sshpass, which we use to pass credentials to rsync
 	command -v sshpass >/dev/null 2>&1 || { echo >&2 "I require sshpass but it's not installed. Aborting."; exit 1; }
 
 	# checks to make sure the desired working directory exists
@@ -52,7 +52,7 @@ function optimize_pantheon_images() {
 
 	# download files
 	echo "Downloading Files"
-	sshpass -p "$PASSWORD" rsync --partial -rlvz --size-only --ipv4 --progress -e "ssh -p 2222 -o StrictHostKeyChecking=no" $ENV.$SITE@appserver.$ENV.$SITE.drush.in:files/* ./files/
+	sshpass -p "$PASSWORD" rsync -am --include='*.jpg' --include='*.jpeg' --include='*/' --exclude='*' --partial -rlvz --size-only --ipv4 --progress -e "ssh -p 2222 -o StrictHostKeyChecking=no" $ENV.$SITE@appserver.$ENV.$SITE.drush.in:files/* ./files/
 	if [ "$?" = "0" ] ; then
 		echo "Download completed"
 	else
@@ -64,12 +64,12 @@ function optimize_pantheon_images() {
 	FILES=$(find . -iname '*.jpg' -o -iname '*.jpeg')
 	for F in $FILES; do
 		echo "Optimizing: $F"
-		jpegtran -copy none -progressive -outfile $F $F
+		jpegtran -copy none -progressive -outfile "$F" "$F"
 	done
 
 	# upload files
 	echo "Uploading Files"
-	sshpass -p "$PASSWORD" rsync --partial -rlvz --size-only --ipv4 --progress -e "ssh -p 2222 -o StrictHostKeyChecking=no" . --temp-dir=../tmp/ $ENV.$SITE@appserver.$ENV.$SITE.drush.in:files/.
+	sshpass -p "$PASSWORD" rsync -am --include='*.jpg' --include='*.jpeg' --include='*/' --exclude='*' --partial -rlvz --size-only --ipv4 --progress -e "ssh -p 2222 -o StrictHostKeyChecking=no" . --temp-dir=../tmp/ $ENV.$SITE@appserver.$ENV.$SITE.drush.in:files/.
 	if [ "$?" = "0" ] ; then
 		echo "Upload completed"
 	else
