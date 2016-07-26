@@ -20,6 +20,10 @@
 
 function optimize_pantheon_images() {
 
+        RETRY_DELAY=120
+        RSYNC_DL_COUNT=0
+        RSYNC_RETRIES=10
+
 	# checks for the presence of jpegtran, which we use for image optimization
 	command -v jpegtran >/dev/null 2>&1 || { echo >&2 "I require jpegtran but it's not installed. Aborting."; exit 1; }
 
@@ -52,13 +56,17 @@ function optimize_pantheon_images() {
 
 	# download files
 	echo "Downloading Files"
-	sshpass -p "$PASSWORD" rsync -am --include='*.jpg' --include='*.jpeg' --include='*/' --exclude='*' --partial -rlvz --size-only --ipv4 --progress -e "ssh -p 2222 -o StrictHostKeyChecking=no" $ENV.$SITE@appserver.$ENV.$SITE.drush.in:files/* ./files/
-	if [ "$?" = "0" ] ; then
-		echo "Download completed"
-	else
-		echo "Download failure. Backing off and retrying..."
-		sleep 180
-	fi
+	while [  $RSYNC_DL_COUNT -lt $RSYNC_RETRIES ]; do
+		sshpass -p "$PASSWORD" rsync -am --include='*.jpg' --include='*.jpeg' --include='*/' --exclude='*' --partial -rlvz --size-only --ipv4 --progress -e "ssh -p 2222 -o StrictHostKeyChecking=no" $ENV.$SITE@appserver.$ENV.$SITE.drush.in:files/* ./files/
+		if [ "$?" = "0" ] ; then
+			echo "Download completed"
+			break
+		else
+			echo "Download failure. Backing off and retrying in $RETRY_DELAY seconds ($RSYNC_DL_COUNT)"
+			sleep $RETRY_DELAY
+		fi
+		let RSYNC_DL_COUNT=RSYNC_DL_COUNT+1 
+	done # rsync retry loop
 
 	# optimize jpgs
 	FILES=$(find . -iname '*.jpg' -o -iname '*.jpeg')
